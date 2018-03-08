@@ -36,7 +36,7 @@ INSTRUCTION LEVEL PARALELISM
 
 8) Explicar el concepto de ejecución superescalar. Relacionarlo con el concepto de Hyper-Threading (Intel SMT).
 
-8) Explicar la idea detrás del concepto de Out-of-Order Execution. 
+9) Explicar la idea detrás del concepto de Out-of-Order Execution. 
 	- Mencionar ventajas y desventajas de su utilización. 
 	- Ejemplificar el diagrama de un flujo de ejecución In-Order vs la misma ejecución Out-of-Order.
 
