@@ -629,30 +629,120 @@ generen stalls, ya sea deteniendo las etapas o unidades funcionales
 necesarias, o insertando burbujas. Para ello, divide la etapa de decode en dos
 etapas, Issue y Read Operands. La ejecución de una instrucción comprendería
 las etapas, todas ellas conectadas a una unidad de scoreboard (marcador,
-pizarra):
+pizarra), que va guardando la información necesaria de cada etapa (ejemplo,
+las utilizaciones de cada operando):
 
 Fetch -> Issue -> Read Operands -> Execute -> Write Results
    |       |          |               |            |
    ---------------------- Scoreboard ---------------
-   
+
+  1) Fetch: se lee la siguiente instrucción
+
+  2) Issue: se decodifica la instrucción, y se detectan las dependencias
+  (lecturas y escrituras), que serán memorizadas para las siguientes etapas.
+  Si existe una dependencia WAW, se detiene la ejecución de esa instrucción
+  hasta que la escritura sobre el registro de salida se haya realizado.
+  También se detiene la ejecución si no hay unidades funcionales disponibles.
+
+  3) Read Operands: se leen los operandos necesarios para ejecutar la
+  instrucción. Si existe una dependecia RAW, se detiene la lectura hasta que
+  los operandos necesarios se encuentren disponibles, ie. que hayan sido
+  escritos por la instrucción correspondiente.
+
+  4) Execute: se ejecutan las instrucciones y se informa cuando se liberan
+  unidades funcionales.
+  
+  5) Write Results: se escriben los resultados. Si existe una dependencia WAR,
+  se detiene la escritura hasta que todas las operaciones que quieran leer de
+  esa instrucción lo hayan hecho (que hayan completado su etapa de Read
+  Operands).
+
+Las ventaja del scoreboarding es su simpleza y que requiere relativamente poco
+hardware adicional en comparación con otros métodos. Las desventajas es que no
+soluciona las falsas dependencias (WAR, WAW), sino que sólamente previene los
+riesgos asociados, ya que para evitar que el programa tome un estado inválido
+las instrucciones deben detenerse hasta que las dependencias se resuelvan, y
+esto sólamente sería verdaderamente necesario en las verdaderas dependencias
+(RAW). Por ejemplo, las instrucciones con dependencias WAW se detienen en la
+etapa de Issue, cuando utilizando alguna otra técnica en realidad podrían
+detenerse en la etapa Write Results.
+
 ```
 
-
-# TODO
-
-
-
-1) Fetch: se lee la siguiente instrucción
-2) Issue: se 
-3) Read Operands: se leen
-4) Execute: 
-5) Write Results:
-
 12) ¿Qué es el algoritmo de Tomasulo, y para qué sirve?
-    - Explicar cuáles son las etapas que lo componen, y qué se realiza en cada una de ellas. 
+    - Explicar cuáles son las etapas que lo componen, y qué se realiza en cada una de ellas.
     - Dibujar un diagrama que relacione las etapas con el resto de los componentes (ejemplo, Reservation Station, Common Data Bus, Reorder Buffer).
     - ¿Qué dependencias busca solucionar en comparación con Scoreboarding, y de qué forma lo hace?
     - Mencionar ventajas y desventajas generales.
+
+```
+
+El algoritmo de Tomasulo es un método de Out-of-Order Execution, cuya
+principal idea se basa en el renombrado de registros, algo que permite lidiar
+con las falsas dependencias mucho mejor que Scoreboarding.
+
+RAT = Register Alias Table
+UF = Unidad Funcional (puede ser punto flotante, escalar, etc)
+RS = Reservation Station (cada RS puede albergar una cierta cantidad de instrucciones pendientes)
+CDB = Common Data Bus
+SB = Store Buffer
+LB = Load Buffer
+
+                    |-> RS -> UF -->|<-------> SB
+FETCH----->ISSUE--->|-> RS -> UF -->|
+                    |-> RS -> UF -->|<-------> LB
+                    |               |
+       RAT <------->|----->CDB<-----|<-------> RF
+
+
+En su implementación más básica, sus principales componentes son:
+
+  - Common Data Bus: interconecta todos los componentes. Cada vez que una
+    unidad de ejecución completa una instrucción, la informa a través de
+    este bus mediante un broadcast, de forma tal que todos los componentes
+    necesarios puedan saberlo a la vez.
+
+  - Unidad de Issue (o Instruction Queue): va cargando las instrucciones en
+    orden en las Reservation Station, a medida que hayan Reservation Station
+    disponibles; es importante notar que cuando existe alguna dependencia, los
+    registros se renombran previamente. Esto evita que existan las dependencias 
+    WAR y WAW.
+
+  - Reservation Station: Son buffers que contienen a las instrucciones. Si
+    las instrucciones tienen dependencias sin resolver, son retenidas. A
+    medida que las instrucciones se van completando, se van resolviendo
+    las dependencias, y entonces se ejecutan. Las dependencias resueltas
+    se reciben a través del CDB.
+
+  - Register File: Son los registros del procesador. Cuando una unidad de
+    ejecución completa una instrucción cuyo alias de salida se encuentra
+    en el RAT, significa que el dato correspondiente debe guardarse en
+    el RF.
+
+  - Load/Store Buffer: Son buffers que leen o escriben a memoria. El
+    funcionamiento es similar al del RF. Cuando un dato es leído,
+    es informada a través del CDB, para que las RS puedan reemplazar los
+    tags por el valor correspondiente, y resolver las instrucciones
+    dependientes.
+
+  - Register Alias Table: Contiene los alias de los registros que son
+    resultados de una instrucción y aún no se han commiteado; ie. los
+    registros que son resultado de las instrucciones que se encuentran en
+    alguna RS. Esto sirve para saber cómo taggear las dependencias cuando una
+    nueva instrucción tiene que ser emitida por la unidad de Issue, y para
+    saber dónde guardar los resultados cuando son emitidos por las UF.
+
+Vale mencionar que esta versión básica de Tomasulo permite que existan
+excepciones imprecisas. Existe una versión de Tomasulo que utiliza, además, un
+Reorder Buffer, que básicamente es un buffer cíclico, que va guardando la
+información en-orden de las instrucciones a medida que son sacadas de la
+unidad de Issue, y luego se encarga de que las instrucciones sean commiteadas
+en orden.
+
+
+```
+
+# TODO
 
 13) Explicar qué son los obstáculos de control. 
     - Caracterizar los tipos de discontinuidad que se pueden encontrar en el flujo de una ejecución.
