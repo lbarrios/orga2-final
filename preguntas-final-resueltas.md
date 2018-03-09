@@ -742,14 +742,83 @@ en orden.
 
 ```
 
-# TODO
-
 13) Explicar qué son los obstáculos de control. 
     - Caracterizar los tipos de discontinuidad que se pueden encontrar en el flujo de una ejecución.
 
+```
+
+Los obstáculos de control son aquellos en donde el flujo de ejecución se ve
+alterado por instrucciones de control. Cuando esto sucede, se dice que el
+flujo de ejecución tiene un branch (una ramificación).
+
+Los tipos de saltos se pueden clasificar en:
+
+  Condicional: Son los saltos que dependen del resultado de instrucciones
+  previas; en otras palabras, la dirección de destino depende del contexto de
+  ejecución del programa.
+
+  Incondicional: Son los saltos que no dependen del resultado de
+  instrucciones. La dirección de destino siempre es la misma.
+
+  Directos: La dirección de salto es un parámetro inmediato.
+
+  Indirectos: La dirección de salto está localizada en memoria o en un
+  registro, y debe resolverse.
+
+  Return: Son los saltos ocasionados por el retorno de una función; la
+  dirección de retorno se encuentra en el stack.
+
+También existen discontinuidades ocasionadas por interrupciones o excepciones,
+las cuales no son predecibles.
+
+Cuando un flujo de ejecución tiene un salto condicional, y este termina siendo
+realizado, se denomina branch taken.
+
+```
+
 14) ¿Qué sucede con el pipeline cuando el procesador encuentra un salto? Explicar el concepto de Branch Prediction, y relacionarlo con los distintos tipos de branches que pueden encontrarse.
 
+```
+
+En condiciones básicas, cuando se encuentra un salto, hay que descartar todo
+el pipeline, ya que todas las instrucciones que se estaban procesando dejan de
+parte del flujo de ejecución válido del programa. Esto afecta gravemente el
+rendimiento.
+
+Branch Prediction es un conjunto de técnicas destinadas a mitigar el efecto de
+los saltos, prediciendo con anticipación la dirección de destino cuando exista
+un salto, evitando que haya que descartar el pipeline. Cuando los branches son
+incondicionales, predecir el destino es sencillo, ya que es parámetro de la
+propia instrucción. Otros tipos de branches (incondicionales, indirectos,
+etcétera) no son tan sencillos.
+
+Siempre vale la pena aplicar Branch Prediction, ya que en el peor de los casos
+se termina prediciendo una dirección equivocada, y hay que descartar el
+pipeline (que es lo mismo que sucede en una situación en la que no se predice
+nada).
+
+```
+
 15) Diferenciar los conceptos de predicción estática vs predicción dinámica. Ventajas y desventajas de cada una.
+
+```
+
+La predicción estática son aquellas técnicas de branch prediction que se
+realizan por fuera del contexto de ejecución. Esto pueden ser optimizaciones
+durante la compilación del programa, o presunciones sobre los saltos (ejemplo,
+siempre que haya un salto condicional, el branch va a ser taken). Esto permite
+resolver los saltos de forma sencilla, y sin contar con hardware ni
+información adicional. La desventaja es que los niveles de acierto utilizando
+este tipo de predicciones por lo general no son buenos. Por ejemplo, un salto
+indirecto no puede ser predicho mediante predicción estática.
+
+La predicción dinámica utiliza información adicional del contexto de ejecución
+a la hora de resolver las direcciones de destino. Esta información puede ser
+la dirección de salto de la última vez que se haya corrido esa misma
+instrucción, si resultó ser branch taken o not taken, el historial de los
+últimos saltos realizados, etcétera.
+
+```
 
 16) Explicar las siguientes técnicas. Mencionar ventajas, desventajas y requerimientos de cada una:
     - Branch Always Not Taken
@@ -760,24 +829,167 @@ en orden.
     - Loop Unrolling
     - Predicated Execution
 
-17) ¿Qué es el Branch Target Buffer, para qué sirve, cómo funciona y cómo está compuesto?
+```
+
+Branch Always Not Taken: se asume que siempre que haya un salto condicional,
+este no será tomado. Por lo general no tiene un buen nivel de acierto, ya que
+en los loops se realizan varios saltos, y sólamente el último (cuando se viola
+la condición de la guarda) resulta not taken. No se requiere contar con ningún
+tipo de soporte especial para realizar este tipo de predicciones.
+
+Branch Always Taken: se asume que siempre que haya un salto condicional, este
+será tomado. El nivel de acierto es mejor en este caso. No se requiere contar
+con ningún tipo de soporte especial para realizar este tipo de predicciones.
+
+Backward Taken Forward Not Taken: Es una combinación de los anteriores. Se
+asume que cuando los saltos son hacia atrás, serán tomados, y cuando son hacia
+adelante, no serán tomados. Esto es así, porque por lo general los saltos
+hacia atrás son loops, y los saltos hacia adelante son if, y estadísticamente
+funciona mejor hacer esta distinción. No se requiere contar con ningún tipo de
+soporte especial para realizar este tipo de predicciones.
+
+Profile-Driven Prediction: Es una predicción realizada luego de un profiling
+del programa. El principal problema es que se debe contar con una muestra
+previa de las ejecuciones del programa, que no siempre es posible, y que
+además no siempre un subconjunto de ejecuciones van a ser representativos del
+resto de las ejecuciones. Se requiere (mínimamente) contar con un soporte
+especial por parte del compilador.
+
+Delayed Branch Slot: ... no lo entendí-
+TODO: explicar DBS (Dragon Ball Super?)
+
+Loop Unrolling: Consiste en desenrollar los ciclos, para transformarlos en una
+secuencia de instrucciones en donde no hayan saltos. Ejemplo, un ciclo que
+ejecute el código "C" 5 veces, puede ser reemplazado por un código sin ciclos
+que ejecute "CCCCC". Esto, a pesar de ser una buena técnica, no siempre es
+posible (la cantidad de repeticiones del ciclo no siempre pueden ser
+determinados en tiempo de compilación). Además, aumenta el tamaño del
+programa, lo cual (por ejemplo) puede llegar a afectar el hitrate de la caché.
+
+Predicated Execution: consiste en tener instrucciones específicas, definidas
+en la ISA, que se ejecuten condicionalmente, para transformar los branches en
+un conjunto de instrucciones condicionales. Esto requiere de un soporte
+especial por parte del hardware, y también del compilador.
+
+```
+
+17) ¿Qué es el Branch Target Buffer (o Branch Target Predictor), para qué sirve, cómo funciona y cómo está compuesto?
+
+```
+
+El Branch Target Buffer es una memoria que almacena, dada dirección de una
+instrucción, la dirección de destino del salto (en caso de que la instrucción
+sea un salto). También puede almacenar si el salto fue tomado o no.
+
+Sirve para predecir si una instrucción va a ser de salto y, además, cuál sería
+la dirección de destino en ese caso. El funcionamiento es similar al de una
+memoria caché.
+
+En la práctica se puede implementar con los últimos N bits de la dirección de
+la instrucción (es decir, la dirección modulo N), ya que guardar una tabla de
+2^64 direcciones no sería posible, o con una memoria asociativa.
+
+En la práctica el BTB y el BHT (pregunta siguiente) pueden estar combinados.
+
+```
 
 18) ¿Qué es el Branch Prediction Buffer (o Branch History Table, one-level predictor), para qué sirve, cómo funciona y cómo está compuesto?
     - Explicar cómo funciona un predictor de 1 bit. Explicar su funcionamiento mediante un diagrama de flujo y/o máquina de estados.
     - Explicar cómo funciona un predictor de 2 bits. Explicar su funcionamiento mediante un diagrama de flujo y/o máquina de estados.
     - Explicar cómo funcionaría en el caso general un one-level predictor que utilice un contador de n bits. ¿Presentan alguna ventaja respecto a los de menor cantidad de bits?
 
+```
+
+El branch prediction buffer sirve para predecir si un branch será tomado o no.
+Por lo general se accede mediante los últimos N bits de la dirección, y
+almacena un contador que depende de las ejecuciones de los saltos anteriores.
+
+--
+
+El predictor de 1 bit, almacena 0 si el salto fue not-taken, y 1 si el salto
+fue taken. Cada vez que una instrucción se commitea, le informa si la
+instrucción fue o no un salto, por lo que se actualiza el valor en caso de ser
+necesario.
+
+              -------->taken------>
+(not taken)  0                     1 (taken)
+              <-----not taken<-----
+
+A la hora de predecir si va a haber un salto, busca la dirección en la tabla.
+Si no está, utiliza algún mecanismo de predicción estática (ejemplo Always
+Taken, o BTFNT). Si la dirección está, si es un 1 asume taken, y realiza el
+salto, mientras que si es un 0 asume not-taken, y no realiza el salto. Luego,
+cuando la instrucción se ejecute, en caso de que la predicción haya sido
+equivocada se corregirá el valor en la tabla.
+
+--
+
+El predictor de 2 bits tiene un funcionamiento similar al del predictor de 1
+bit, con la diferencia de que el contador utilizado es de dos bits (con
+saturación). Es decir, cada vez que una instrucción realiza un salto, se le
+suma 1 a esa dirección en la tabla, y cada vez que el salto no es realizado,
+se le resta 1, pero teniendo en cuenta que:
+
+  * si está en 00 y se le resta, queda en 00, 
+  * si está en 11 y se suma, queda en 11,
+  * si está en 01 y se le suma, pasa a 11, 
+  * si está en 10 y se le resta, pasa a 00,
+
+
+    -------->taken---->   
+ 00                     01
+  ^ <----not taken<----  |
+  |                      |
+not taken              taken
+  |                      |
+  | ------>taken------>  v
+ 10                     11
+    <----not taken<----
+
+Este predictor ha demostrado estadísticamente tener un mejor ratio de
+predicción que el de 1 bit.
+
+--
+
+Un predictor de N bits, en general, es similar al de dos bits, manteniendo las
+cuatro condiciones de saturación descriptas anteriormente. Por ejemplo, para
+5 bits:
+
+  * si está en 00000 y se le resta, queda en 00000, 
+  * si está en 11111 y se suma, queda en 11111,
+  * si está en 01111 y se le suma, pasa a 11111, 
+  * si está en 10000 y se le resta, pasa a 00000,
+
+```
+
 19) ¿Qué son los Correlation-Based Branch Predictor?
     - ¿En qué se diferencian de los one-level predictor de n bits?
     - Explicar los conceptos de local y global branch correlation.
 
+```
 
+Los predictores de correlación, también llamados predictores de dos niveles,
+son aquellos en donde se usa otra información del contexto de ejecución además
+de los resultado de "los últimos N saltos".
 
--------
+TODO: Explicar lo que queda de esta parte :(
+
+```
+
 MEMORIA
--------
+=======
+
+# TODO:
 
 1) ¿Cuáles son las principales diferencias entre las memorias ROM y las RAM? Dar ejemplos de memorias de cada tipo.
+
+```
+
+Las memorias ROM son memorias que no necesitan electricidad para almacenar los datos.
+
+Las memorias RAM son memorias que necesitan estar alimentadas permanentemente de electricidad para almacenar la información.
+
+```
 
 2) Distinguir entre memoria ram estática y dinámica, mencionando ventajas y desventajas de cada una. ¿Cuál de ellas es usada para memoria caché, y cuál es usada para memoria principal? Comparar según:
     - cómo es el circuito (tamaño, cantidad de componentes electrónicos),
@@ -785,40 +997,280 @@ MEMORIA
     - tiempo de acceso,
     - capacidad de almacenamiento por chip,
     - costo de fabricación
+    - uso típico
+
+```
+
+Las memorias RAM dinámicas están hechas por un circuito eléctrico muy simple,
+utilizando para cada bit un capacitor para almacenar la carga, y un transistor
+para cortar el paso de corriente. La lectura de las mismas es destructiva (ya
+que se vacía el capacitor), por lo que requieren de un circuito de
+retroalimentación que vuelva a cargar el valor leído luego de la misma.
+También requieren un refresco períodico de la información, para evitar que la
+carga del capacitor se degrade. El consumo eléctrico es bajo, y la capacidad
+de almacenamiento por chip es alta, ya que el circuito es muy simple. El costo
+de fabricación también es bajo. Pero el tiempo de acceso es lento, ya que la
+lectura no solo implica leer la información, sino retroalimentarla. Su uso
+típico es para memoria principal de la PC (lo que normalmente llamamos memoria
+RAM).
+
+Las memorias RAM estáticas están compuestas por un flip-flop, que requiere 6
+transistores, siendo un circuito más complejo que el de las DRAM. La lectura
+no es destructiva, y no necesitan ser refrescados. Tres de los transistores se
+encuentran en estado de corte, y tres en estado de saturación, por lo que el
+consumo eléctrico es mayor al de las DRAM. Además, al ser la densidad del
+circuito mayor, la capacidad de almacenamiento por chip es menor, y el costo
+de fabricación es mayor. El tiempo de acceso es mucho mayor que el de las
+DRAM, ya que no necesitan de ningún circuito adicional de retroalimentación.
+Su uso típico es para memorias caché.
+
+```
 
 3) ¿Cuál es la función de la memoria caché, y cuáles son los dos principios sobre los cuales se fundamenta su utilización?
 
+```
+
+La memoria caché se encuentra entre la memoria principal y el procesador, y su
+función es la de proveer de los datos al procesador de forma mucho más rápida,
+ya que está hecha de memoria SRAM. 
+
+Su utilización se fundamenta en los principios de localidad espacial y
+temporal.
+
+  Principio de localidad espacial: si una dirección de memoria fue accedida
+  recientemente, es probable que las direcciones contiguas también sean
+  accedidas.
+
+  Principio de localidad temporal: si una dirección de memoria fue accedida
+  recientemente, es probable que vuelva a ser accedida nuevamente en el
+  futuro.
+
+```
+
 4) Describir los algoritmos de reemplazo más comunes, y relacionarlos con los principios mencionados anteriormente.
+
+```
+
+Dado que la caché tiene un tamaño menor al de la memoria principal (sino no
+tendría sentido su uso), se llena rápidamente, lo cual implica que hay que
+establecer políticas de desalojo de líneas para hacer lugar a las nuevas
+líneas. Las más comunes son:
+
+  Random: Se desaloja alguna línea.
+
+  FIFO (First In First Out): Se desaloja la línea más vieja, según el orden en
+  que se las fue alojando
+
+  LRU (Least Recently Used): Se desaloja la línea más vieja, según el orden en
+  que van siendo utilizadas.
+
+  LFU (Least Frequenly USed): Se desaloja la línea que tenga menor cantidad de
+  usos.
+
+```
 
 5) Diferenciar entre caché de mapeo directo, totalmente asociativa, y asociativa por conjuntos. Dar un ejemplo de cada una, y mencionar ventajas y desventajas.
 
+```
+
+Mapeo directo: cada bloque de memoria se asocia a un único bloque de caché.
+Esto se realiza calculando la dirección del bloque de memoria mod k, en donde
+k es la cantidad de bloques de caché. La principal desventaja de este esquema
+es que en un caso patológico dos (o más) direcciones de memoria podrían estar
+compitiendo constantemente por alojar/desalojar el mismo bloque, lo cual
+tendría un impacto enorme en el rendimiento.
+
+Totalmente asociativa: cada bloque de memoria no tiene un mapeo fijo, sino que
+puede ir a parar a cualquier bloque disponible dentro de la caché. Esto
+requiere de una lógica de control específica, e impacta sobre la complejidad,
+el tamaño y el precio de la memoria. La principal ventaja es que no suceden
+las colisiones que suceden con Mapeo Directo, lo cual evita casos patológicos
+y permite implementar políticas de desalojo mucho mejores.
+
+Asociativa por conjuntos: es una mezcla entre los dos tipos de caché
+anteriores. Se cuenta con una cantidad S de memorias asociativas, y se divide
+la memoria en S sets, de forma tal que cada dirección va a parar a un set
+determinado, y dentro del set se guarda de forma totalmente asociativa.
+Mediante este tipo de memoria se logra un buen tradeoff entre las ventajas y
+las desventajas de cada tipo.
+
+
+```
+
 6) Describir las políticas de escritura más comunes, y las ventajas y desventajas de cada una.
+
+```
+
+Write-Through: Cada vez que se escribe una línea, el cambio se escribe también
+en memoria principal. Esto tiene como ventaja que mantiene la coherencia entre
+la memoria principal y la caché, lo cual puede ser útil en caso de que un
+periférico quiera acceder a esa misma memoria, y de que es fácil de
+implementar. El inconveniente es que elimina totalmente (para los casos de
+escritura) los beneficios que brinda la caché, ya que la latencia termina
+siendo la misma (o un poco más, según el caso) que si se trabajara con memoria
+principal.
+
+Write-Back: Las líneas no son transmitidas a memoria principal, sino sólamente
+hasta que son desalojadas. Esto tiene como ventaja que se preserva el
+beneficio de latencia brindado por la caché. Tiene como desventaja que la
+lógica para implementarla es más compleja, y que se requieren realizar
+controles y operaciones adicionales a la hora de desalojar una línea, o de
+utilizar un periférico que acceda a memoria (por ejemplo, quitando esa línea
+de la caché, y transformándola en no-cacheable mientras el periférico la esté
+utilizando).
+
+Write-Through-Buffered: Es una mezcla entre las políticas anteriores. Se
+agrega un buffer de escrituras, y cada vez que se escribe una línea se la
+envía a ese buffer. Las escrituras se van realizando de forma autónoma por la
+controladora de caché, permitiendo que mientras tanto el procesador siga con
+la ejecución de instrucciones. Si el buffer está lleno, se espera hasta que se
+haga lugar. La ventaja es que mantiene la coherencia con la memoria principal,
+al mismo tiempo que disminuye notablemente el impacto de Write-Through,
+teniendo un rendimiento más similar al de memorias Write-Back. La desventaja
+es que requiere de todavía más circuito y lógica adicional, por lo que resulta
+caro de implementar.
+
+```
 
 7) ¿Qué características generales debe cumplir un sistema para ser considerado SMP? Describir en qué consiste, en un sistema SMP de bus compartido, el problema de la coherencia de caché.
 
+```
+
+Para que un sistema sea Simmetric Multi-Processing, por lo general debe cumplir con:
+
+  Existen dos o más procesadores de capacidades similares.
+
+  Todos los procesadores pueden ejecutar las mismas funciones (esto se
+  entendería como, tienen la misma ISA).
+
+  Existe un sistema operativo que posibilita la interacción entre los
+  procesadores.
+
+  Los procesadores comparten la memoria principal, y los dispositivos de
+  entrada y salida, mediante un mismo bus que los conecta, de forma tal que el
+  tiempo de acceso a memoria es el mismo para todos ellos.
+
+Por lo general el bus compartido funciona de árbitro, secuenciando las
+operaciones de los distintos procesadores, y haciendo de cuello de botella.
+Por este motivo, el sistema SMP no escala a una gran cantidad de procesadores
+(ejemplo, 1024 procesadores).
+
+En este contexto, el problema de la coherencia de caché se da cuando dos
+procesadores tienen en sus respectivas caché distinta información sobre una
+misma línea de memoria. Un ejemplo básico de esto es, P1 lee la dirección X,
+P2 lee X, y luego P1 escribe X. Incluso en un esquema de escritura Write-
+Through, a priori (sin establecer un mecanismo de coherencia) nada asegura que
+P2 y P1 vayan a tener el mismo valor en la dirección X.
+
+```
+
 8) ¿Qué condiciones debe cumplir un sistema de memoria para ser considerado coherente? Explicar las propiedades de coherencia y consistencia, y relacionarlas con los conceptos de propagación y serialización.
+
+```
+
+Para que un sistema de memoria sea coherente debe cumplir con las características de:
+
+  Coherencia: Todos los procesadores comparten la misma información. Esto está
+  relacionado con la correcta propagación de la información, a modo de
+  ejemplo, "cuando un procesador realiza una escritura, debe propagarla a las
+  otras cachés". Una implementación muy básica de propagación (ejemplo, avisar
+  sobre todas las operaciones a todos los procesadores) puede degradar
+  enormemente el rendimiento.
+
+  Consistencia: Las operaciones realizadas sobre una determinada línea de
+  memoria son vistas por todos los procesadores en el mismo orden relativo,
+  que además debe ser coherente con el orden respecto a las operaciones sobre
+  las otras líneas de memoria. Es decir, si sucede en el siguiente orden que:
+  P1 escribe en X, P2 escribe en X, P1 lee de X, P3 escribe en X y P1 lee de
+  X, cada procesador debe comportarse respetando este orden. Dado que los
+  procesadores trabajan de forma concurrente, garantizar esto no es sencillo.
+  Ejemplo muy básico: si el protocolo es "escribir y luego avisar al resto", y
+  P1 y P2 escriben al mismo tiempo en la dirección X, lo que terminaría
+  sucediendo es que P1 se quedaría con el valor escrito por P2, y P2 se
+  quedaría con el valor escrito por P1, ya que cada uno tendría las lecturas
+  en el orden inverso.
+
+
+```
 
 9) ¿Qué soluciones existen para los problemas de coherencia de caché en sistemas monoprocesador? Ejemplo, cuando un dispositivo DMA escribe a memoria. 
     - ¿Qué ventajas y desventajas traen estas soluciones? 
     - ¿Requieren algún tipo de soporte de hardware o software especial? 
     - ¿Por qué no resulta práctico implementar esto mismo en sistemas SMP?
 
+```
+
+Las soluciones posibles son varias:
+
+  Desalojar las líneas de caché antes de realizar DMA. Esto se hace
+  manualmente, invalidándolas por software. Aumenta la complejidad del código.
+  A priori, no es posible prever cuando otro procesador va a querer usar una
+  determinada línea de memoria, por lo que sin un protocolo de comunicación
+  destinado a mantener la coherencia de caché, esto no sería posible.
+
+  Que el DMA pueda realizarse directo sobre la caché. Esto requiere contar con
+  hardware especial. Aumenta la complejidad del hardware. Si cada procesador
+  accede a la información directo en la caché del procesador 0 (posible
+  implementación), entonces habría que eliminar la caché de los otros
+  procesadores, y no tendría sentido usar caché. Además, esto afectaría el
+  rendimiento del procesador 0, ya que estaría recibiendo constantes pedidos
+  de lectura de otros procesadores.
+
+  Definir instrucciones que permitan setear a una línea de memoria como no-
+  cacheable. Requiere una arquitectura especial, y aumenta la complejidad del
+  código. Para implementar esto en SMP habría que definir todas las
+  direcciones de memoria en uso como no cacheables, es decir, no usar caché.
+
+  Definir arquitecturas especiales en donde la DMA se pueda realizar sobre
+  ciertos sectores de memoria que estén definidos como no-cacheables. Requiere
+  contar con una arquitectura y posiblemente un hardware especial. Los accesos
+  a estas direcciones de memoria serían lentos. Para implementar esto en SMP
+  habría que definir todas las direcciones posibles como no cacheables, o sea,
+  no usar caché.
+
+
+```
+
 10) Describir la idea detrás de los protocolos de directorio y los protocolos de snooping, comparando ventajas y desventajas de cada uno de ellos.
+
+```
+
+Los protocolos de directorio se basan en que la coherencia de caché esté
+regida por un dispositivo externo (directorio). Son populares en sistemas
+grandes con muchos procesadores. Cada procesador se comunica con el
+directorio, quien es el que toma las decisiones de coherencia. Requieren de
+hardware adicional para su implementación, y desde el vamos presentan una
+latencia mayor, ya que las operaciones deben ser coordinadas por un único
+directorio. Se utiliza mucho en entornos de clusters (redes de computadoras de
+muchos procesadores).
+
+Los protocolos de snooping se basan en un bus único, que hace que las
+transmisiones sean secuenciales. Cada procesador se encarga de espiar el bus,
+y de hacer broadcast de las operaciones necesarias para permitir la
+coherencia.
+
+```
 
 11) Describir las diferencias entre los protocolos de invalidación en escritura, vs los de actualización en escritura. Ejemplificar, ¿qué ocurre en cada caso si un procesador desea leer de su caché una posición de memoria que fue previamente modificada por otro procesador?
 
-11) Explicar cómo funciona un protocolo de snooping, de dos estados (válido, inválido).
+```
+
+Los protocolos de invalidación de escritura realizan la invalidación de los datos 
+
+```
+
+12) Explicar cómo funciona un protocolo de snooping, de dos estados (válido, inválido).
     - ¿Cumple con las condiciones de coherencia y consistencia?
     - ¿Qué políticas de escritura soporta?
     - ¿Qué ventajas y desventajas trae usar este protocolo?
 
-12) Explicar en qué consiste y cómo funciona el protocolo MSI, detallando cada estado.
+13) Explicar en qué consiste y cómo funciona el protocolo MSI, detallando cada estado.
     - Explicar la diferencia con el protocolo de snooping de dos estados.
     - ¿Cumple con las condiciones de coherencia y consistencia?
     - ¿Qué políticas de escritura soporta?
     - ¿Qué ventajas y desventajas trae usar este protocolo?
 
-13) Explicar cómo funciona el protocolo MESI, detallando cada estado. Hacer un diagrama.
+14) Explicar cómo funciona el protocolo MESI, detallando cada estado. Hacer un diagrama.
     - Explicar la diferencia diferencia con MSI, ¿qué ventajas presenta?
     - ¿Cumple con las condiciones de coherencia y consistencia?
     - ¿Qué políticas de escritura soporta?
@@ -833,3 +1285,5 @@ CASOS PRÁCTICOS / PAPERS
 1) Explicar la microarquitectura P6 (Three Cores Engine).
 
 2) Explicar la arquitectura Netburst, y las ventajas frente a P6.
+
+3) Explicar las ventajas de HyperThreading.
