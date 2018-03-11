@@ -979,8 +979,6 @@ TODO: Explicar lo que queda de esta parte :(
 MEMORIA
 =======
 
-# TODO:
-
 1) ¿Cuáles son las principales diferencias entre las memorias ROM y las RAM? Dar ejemplos de memorias de cada tipo.
 
 ```
@@ -1238,16 +1236,23 @@ Las soluciones posibles son varias:
 Los protocolos de directorio se basan en que la coherencia de caché esté
 regida por un dispositivo externo (directorio). Son populares en sistemas
 grandes con muchos procesadores. Cada procesador se comunica con el
-directorio, quien es el que toma las decisiones de coherencia. Requieren de
-hardware adicional para su implementación, y desde el vamos presentan una
+directorio, quien es el que toma las decisiones de coherencia; cada bloque de
+Caché tiene un único Owner, que está coordinado por este Directorio. Requieren
+de hardware adicional para su implementación, y desde el vamos presentan una
 latencia mayor, ya que las operaciones deben ser coordinadas por un único
 directorio. Se utiliza mucho en entornos de clusters (redes de computadoras de
 muchos procesadores).
 
 Los protocolos de snooping se basan en un bus único, que hace que las
-transmisiones sean secuenciales. Cada procesador se encarga de espiar el bus,
-y de hacer broadcast de las operaciones necesarias para permitir la
-coherencia.
+transmisiones sean secuenciales (y por lo tanto los requests). Cada procesador
+se encarga de espiar el bus, y de hacer broadcast de las operaciones
+necesarias para permitir la coherencia, por lo que no hay un único dispositivo
+coordinando todas las operaciones. No requiere hardware adicional, aunque al
+no haber un dispositivo que coordine requiere un soporte explícito por parte
+de los procesadores, y los protocolos utilizados pueden llegar a ser más
+complejos. Se utiliza en entornos en donde hay pocos procesadores (ejemplo,
+4), pero no escala bien, ya que al utilizar todos el mismo bus, este actúa
+como cuello de botella.
 
 ```
 
@@ -1255,14 +1260,66 @@ coherencia.
 
 ```
 
-Los protocolos de invalidación de escritura realizan la invalidación de los datos 
+Los protocolos de invalidación en escritura emiten mensajes de broadcast
+invalidando el bloque correspondiente en las otras cachés cuando hay una
+escritura en una caché. Así, si una caché quiere leer un bloque que acaba de
+ser modificado por otra caché, tienen que leerlo nuevamente.
+
+Los protocolos de actualización en escritura, emiten mensajes de broadcast con
+los nuevos datos para que las otras cachés los actualicen, evitando que las
+otras cachés tengan que leerlos nuevamente (ya que simplemente los actualizan,
+y siguen marcados como válidos). Si una caché quiere leer un bloque, lo puede
+hacer, siempre que lo tenga en estado válido.
+
+Los protocolos de actualización en escritura pueden tener un rendimiento mucho
+menor a los de invalidación ya que, por ejemplo, múltiples escrituras
+consecutivas a una misma dirección de un bloque de la caché de un procesador,
+hace que se emitan múltiples mensajes broadcast de update (a diferencia de un
+protocolo de invalidación, en donde sólamente se emitiría un mensaje). Peor
+aún, múltiples escrituras en distintas direcciones del mismo bloque (que es un
+caso mucho más común, por ejemplo, imaginemos un arreglo siendo copiado),
+también emitirían múltiples mensajes de broadcast.
 
 ```
+
 
 12) Explicar cómo funciona un protocolo de snooping, de dos estados (válido, inválido).
     - ¿Cumple con las condiciones de coherencia y consistencia?
     - ¿Qué políticas de escritura soporta?
     - ¿Qué ventajas y desventajas trae usar este protocolo?
+
+```
+
+Un protocolo de snooping de dos estados funciona de forma similar a un
+protocolo de coherencia para un solo procesador con write-through. Cada bloque
+de la caché se marca con un estado:
+
+  Válido: indica que los valores de los datos contenidos en ese bloque son
+  coherentes con la memoria principal, y con los otros cachés. Esto significa
+  que la caché puede leer esta información, y para escribirla deberá informar
+  previamente a las otras cachés que deben invalidar el dato. Esto será
+  necesario para cada escritura que se realice.
+
+  Inválido: indica que los valores de ese bloque son incoherentes, es decir,
+  para su utilización se necesitará leerlos previamente.
+
+Cumple coherencia y consistencia, ya que fuerza a que cada vez que un
+procesador desee hacer una escritura, tenga que invalidar previamente los
+bloques en las otras cachés. Y la serialización viene dada por el bus único.
+
+Sólamente soporta políticas de escritura write-through.
+
+La ventaja de este protocolo es que no requiere contar con estados
+adicionales, y la lógica es sencilla, similar a la de un protocolo de
+coherencia monoprocesador. La desventaja es que sólamente funciona con write-
+through, por lo que de por sí arrastra todas las desventajas de write-through.
+Al haber un bus único, y estar serializadas las operaciones de escritura, esto
+genera un cuello de botella incluso en situaciones en donde múltiples
+procesadores se encuentren escribiendo al mismo tiempo, pero cada uno en
+distintos bloques de memoria.
+
+```
+
 
 13) Explicar en qué consiste y cómo funciona el protocolo MSI, detallando cada estado.
     - Explicar la diferencia con el protocolo de snooping de dos estados.
@@ -1270,17 +1327,80 @@ Los protocolos de invalidación de escritura realizan la invalidación de los da
     - ¿Qué políticas de escritura soporta?
     - ¿Qué ventajas y desventajas trae usar este protocolo?
 
+```
+
+El protocolo MSI se puede considerar una extensión del protocolo de snooping
+de dos estados, separando el estado Válido en los estados Modificado o
+Compartido (Shared).
+
+Se describen los estados, desde el punto de vista de la caché que los
+contiene:
+
+  Modificado: los valores de este bloque han sido modificados por este
+  procesador. Esto significa, además, que todos los otros cachés tienen el
+  bloque marcado como inválido. La caché puede hacer escrituras o lecturas
+  libremente sobre el bloque.Si otra caché realiza una lectura de este bloque,
+  el estado pasará a Compartido. Si otra caché realiza una lectura exclusiva
+  de este bloque (o sea, una lectura con intenciones de escribir), el estado
+  pasará a Inválido. Cuando este bloque sea desalojado (o cambie a otro
+  estado), siempre se deberá hacer previamente un write-back de la
+  información a memoria principal.
+
+  Compartido: los valores de este bloque no han sido modificados, y además
+  puede estar compartido en una o más cachés de otros procesadores (o en
+  ninguna). Se pueden hacer lecturas libremente. Cada vez que se desee hacer
+  una escritura, se deberá emitir un pedido de lectura exlusiva (Read For
+  Ownership), para poder pasar al estado modificado, invalidando a todas las
+  otras cachés. Asimismo, si otra caché realiza una lectura exclusiva, se
+  pasará al estado inválido.
+
+  Inválido: los valores de este bloque no son válidos. Si se desea utilizar
+  este bloque, se deberá emitir un pedido de lectura, o de lectura exclusiva,
+  según el caso.
+
+Este protocolo funciona tanto para políticas write-through como write-back.
+
+No tengo ganas de explicar por qué cumple con las condiciones de
+coherencia/consistencia, pero la explicación informal es similar a las
+anteriores: la serialización de las operaciones viene dada por el bus único, y
+la propagación por el protocolo. (TODO: ?)
+
+Las ventajas sobre el protocolo de dos estados son que al haber un estado
+modificado, una caché puede hacer múltiples escrituras sobre un bloque, sin
+necesidad de emitir múltiples broadcast, sino sólamente una invalidación la
+primera vez. Una desventaja es que cada vez que quiera pasar del estado
+compartido a modificado, deberá emitirse un Read For Ownership, aún cuando es
+posible que en realidad ninguna otra caché tenga ese bloque de memoria (por lo
+cual se estaría emitiendo un broadcast innecesario). Es decir, no existe la
+noción de que un determinado bloque exista sólamente en una de las cachés.
+
+```
+
+------------------
+# TODO:
+------------------
+
 14) Explicar cómo funciona el protocolo MESI, detallando cada estado. Hacer un diagrama.
     - Explicar la diferencia diferencia con MSI, ¿qué ventajas presenta?
     - ¿Cumple con las condiciones de coherencia y consistencia?
     - ¿Qué políticas de escritura soporta?
     - Dibujar un diagrama de estados.
-    - ¿Qué desventajas presenta este protocolo?
+    - ¿Qué desventajas presenta este protocolo? ¿Existen soluciones?
+
+```
+
+El protocolo MESI se puede considerar una extensión del protocolo MSI, el cual
+incorpora el estado Exclusivo. Las transiciones entre estados son similares.
+
+El estado Exclusivo indica que el bloque se encuentra en esta caché, y
+sólamente en esta, por lo que es posible hacer transición hacia el estado
+Modificado sin necesidad de emitir un Read For Ownership.
+
+```
 
 
-------------------------
 CASOS PRÁCTICOS / PAPERS
-------------------------
+========================
 
 1) Explicar la microarquitectura P6 (Three Cores Engine).
 

@@ -1,6 +1,5 @@
------------------
 MICROARQUITECTURA
------------------
+=================
 
 1) Definir el concepto de ISA vs Microarquitectura. ¿Para qué sirve esta distinción?
 	- ¿Pueden haber dos procesadores con la misma ISA y distinta microarquitectura? Dar ejemplo.
@@ -11,9 +10,9 @@ MICROARQUITECTURA
 	- ¿Pueden haber dos procesadores con el mismo hardware y distinta organización? Dar ejemplo.
 
 
-----------------------------
+
 INSTRUCTION LEVEL PARALELISM
-----------------------------
+============================
 
 1) Distinguir entre microarquitecturas monociclo vs multiciclo, mencionando ventajas y desventajas de cada tipo.
 
@@ -83,9 +82,9 @@ INSTRUCTION LEVEL PARALELISM
 
 
 
--------
+
 MEMORIA
--------
+=======
 
 1) ¿Cuáles son las principales diferencias entre las memorias ROM y las RAM? Dar ejemplos de memorias de cada tipo.
 
@@ -133,12 +132,12 @@ MEMORIA
 	- ¿Cumple con las condiciones de coherencia y consistencia?
 	- ¿Qué políticas de escritura soporta?
 	- Dibujar un diagrama de estados.
-	- ¿Qué desventajas presenta este protocolo?
+	- ¿Qué desventajas presenta este protocolo? ¿Existen soluciones?
 
 
-------------------------
+
 CASOS PRÁCTICOS / PAPERS
-------------------------
+========================
 
 1) Explicar la microarquitectura P6 (Three Cores Engine).
 
