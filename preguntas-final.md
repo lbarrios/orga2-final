@@ -142,3 +142,5 @@ CASOS PRÁCTICOS / PAPERS
 1) Explicar la microarquitectura P6 (Three Cores Engine).
 
 2) Explicar la arquitectura Netburst, y las ventajas frente a P6.
+
+3) Explicar el funcionamiento y las ventajas de HyperThreading.

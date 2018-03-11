@@ -1406,4 +1406,4 @@ CASOS PRÁCTICOS / PAPERS
 
 2) Explicar la arquitectura Netburst, y las ventajas frente a P6.
 
-3) Explicar las ventajas de HyperThreading.
+3) Explicar el funcionamiento y las ventajas de HyperThreading.
